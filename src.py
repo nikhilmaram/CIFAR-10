@@ -14,24 +14,24 @@ numClasses = 10
 
 W_conv1 = 0.0
 W_conv2 = 0.0
-W_conv3 = 0.0
+
 b_conv1 = 0.0
 b_conv2 = 0.0
-b_conv3 = 0.0
 
+## Number of filters in each convolution layer
 size_conv1 = 5
 size_conv2 = 5
-size_conv3 = 5
 
 depth_conv1 = 64
 depth_conv2 = 64
-depth_conv3 = 64
 
 W_fc1   = 0.0
 W_fc2   = 0.0
 
+
 b_fc1   = 0.0
 b_fc2   = 0.0
+
 
 size_fc1 = 384
 size_fc2 = 192
@@ -40,10 +40,54 @@ W_out = 0.0
 b_out = 0.0
 
 epochs = 100
-initialLearningRate = 0.0001
+initialLearningRate = 0.1
 batchSize = 128
 
 model_path = "/tmp/model.ckpt"
+
+def backupNetwork() :
+    global W_fc1,   W_fc2,    b_fc1,   b_fc2
+    global WB_fc1,  WB_fc2,  WB_out2, bB_fc1,  bB_fc2,  bB_out2
+    global W_conv1,  W_conv2,  b_conv1,  b_conv2
+    global WB_conv1, WB_conv2, bB_conv1, bB_conv2
+    global W_out,b_out
+    global WB_out,bB_out
+
+    WB_fc1      = W_fc1
+    WB_fc2      = W_fc2
+
+    WB_conv1    = W_conv1
+    WB_conv2    = W_conv2
+    bB_fc1      = b_fc1
+    bB_fc2      = b_fc2
+
+    bB_conv1    = b_conv1
+    bB_conv2    = b_conv2
+
+    WB_out = W_out
+    bB_out = b_out
+
+def restoreNetwork() :
+    global W_fc1,   W_fc2,    b_fc1,   b_fc2
+    global WB_fc1,  WB_fc2,  WB_out2, bB_fc1,  bB_fc2,  bB_out2
+    global W_conv1,  W_conv2,  b_conv1,  b_conv2
+    global WB_conv1, WB_conv2, bB_conv1, bB_conv2
+    global W_out,b_out
+    global WB_out,bB_out
+
+    W_fc1      = WB_fc1
+    W_fc2      = WB_fc2
+
+    W_conv1    = WB_conv1
+    W_conv2    = WB_conv2
+    b_fc1      = bB_fc1
+    b_fc2      = bB_fc2
+
+    b_conv1    = bB_conv1
+    b_conv2    = bB_conv2
+
+    W_out = W_out
+    b_out = b_out
 
 def unpickle(file):
     with open(file, 'rb') as fo:
@@ -66,19 +110,15 @@ def convLayer(input,phase=True):
 
     ## Weights and bias of the convolution layer
     global W_conv1, W_conv2, b_conv1, b_conv2
-    ## Number of filters in each convolution layer
-    global depth_conv1,depth_conv2
-    ## kernal size
-    global size_conv1,size_conv2
+
     ## Fully connected layer size
-    global size_fc1,size_fc2
     global W_fc1, W_fc2, b_fc1, b_fc2
 
     global W_out,b_out
 
     ## First convolution Layer
     ##W_conv1 = tf.Variable(tf.random_normal([size_conv1,size_conv1,depth,depth_conv1]),name="W_conv1")
-    W_conv1 = tf.get_variable("W_conv1",shape = [size_conv1,size_conv1,depth,depth_conv1],initializer=tf.contrib.layers.xavier_initializer())
+    W_conv1 = tf.get_variable("W_conv1",shape = [size_conv1,size_conv1,depth,depth_conv1],initializer=tf.contrib.layers.variance_scaling_initializer())
 
     b_conv1 =  tf.Variable(tf.random_normal([depth_conv1]),name="b_conv1")
     ## Convolution layer
@@ -86,8 +126,6 @@ def convLayer(input,phase=True):
     relu1 = tf.nn.relu(conv1, name="relu1")
     ## Max pooling
     pool1 = tf.nn.max_pool(relu1,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool1')
-    ## Normalise
-    #norm1 = tf.contrib.layers.batch_norm(pool1,center=True, scale=True,is_training=phase)
 
     batch_mean1,batch_var1 = tf.nn.moments(pool1,[0])
     norm1 = tf.nn.batch_normalization(pool1, batch_mean1, batch_var1, variance_epsilon=1e-8,scale=1,offset=1e-8)
@@ -95,37 +133,25 @@ def convLayer(input,phase=True):
 
     ## Second Convolution Layer
     ##W_conv2 = tf.Variable(tf.random_normal([size_conv2, size_conv2, depth_conv1, depth_conv2]), name="W_conv2")
-    W_conv2 = tf.get_variable("W_conv2", shape=[size_conv2, size_conv2, depth_conv1, depth_conv2],initializer=tf.contrib.layers.xavier_initializer())
+    W_conv2 = tf.get_variable("W_conv2", shape=[size_conv2, size_conv2, depth_conv1, depth_conv2],initializer=tf.contrib.layers.variance_scaling_initializer())
     b_conv2 = tf.Variable(tf.random_normal([depth_conv2]), name="b_conv2")
     conv2 = tf.nn.conv2d(norm1,W_conv2,[1,1,1,1],padding='SAME',name="conv2") + b_conv2
     relu2 = tf.nn.relu(conv2, name='relu2')
     ## Maxpooling
     pool2 = tf.nn.max_pool(relu2,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool2')
-    ## Normalisation
-    #norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
 
     batch_mean2, batch_var2 = tf.nn.moments(pool2, [0])
     norm2 = tf.nn.batch_normalization(pool2, batch_mean2, batch_var2, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
-    ## Added one more convolution layer
-    W_conv3 = tf.get_variable("W_conv3", shape=[size_conv3, size_conv3, depth_conv2, depth_conv3],
-                              initializer=tf.contrib.layers.xavier_initializer())
-    b_conv3 = tf.Variable(tf.random_normal([depth_conv3]), name="b_conv3")
-    conv3 = tf.nn.conv2d(norm2, W_conv3, [1, 1, 1, 1], padding='SAME', name="conv2") + b_conv3
-    relu3 = tf.nn.relu(conv3, name='relu2')
-    ## Normalisation
-    # norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
-    batch_mean3, batch_var3 = tf.nn.moments(relu3, [0])
-    norm3 = tf.nn.batch_normalization(relu3, batch_mean3, batch_var3, variance_epsilon=1e-8, scale=1, offset=1e-8)
 
     ## Divide by 16 because two convolution layers each convolution layer both height and width has a stride of 2
     sizeAfterConv = int(height * width * depth_conv2 / 16)
     print(sizeAfterConv)
 
-    inpFc = tf.reshape(norm3,[-1,sizeAfterConv])
+    inpFc = tf.reshape(norm2,[-1,sizeAfterConv])
     ## Weights for fully connected Layer
     ##W_fc1 = tf.Variable(tf.random_normal([sizeAfterConv,size_fc1]),name="W_fc1")
-    W_fc1 = tf.get_variable("W_fc1",shape=[sizeAfterConv,size_fc1],initializer=tf.contrib.layers.xavier_initializer())
+    W_fc1 = tf.get_variable("W_fc1",shape=[sizeAfterConv,size_fc1],initializer=tf.contrib.layers.variance_scaling_initializer())
     b_fc1 = tf.Variable(tf.random_normal([size_fc1]),name="b_fc1")
     fc1 = tf.matmul(inpFc,W_fc1) + b_fc1
     relu_fc1 = tf.nn.relu(fc1, name="relu_fc1")
@@ -134,8 +160,11 @@ def convLayer(input,phase=True):
     batch_mean_fc1, batch_var_fc1 = tf.nn.moments(relu_fc1, [0])
     norm_fc1 = tf.nn.batch_normalization(relu_fc1, batch_mean_fc1, batch_var_fc1, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
+    ## Added Dropout
+    norm_fc1 = tf.nn.dropout(norm_fc1,keep_prob=0.9)
+
     ##W_fc2 = tf.Variable(tf.random_normal([size_fc1,size_fc2]),name="W_fc2")
-    W_fc2 = tf.get_variable("W_fc2",shape= [size_fc1,size_fc2],initializer=tf.contrib.layers.xavier_initializer())
+    W_fc2 = tf.get_variable("W_fc2",shape= [size_fc1,size_fc2],initializer=tf.contrib.layers.variance_scaling_initializer())
     b_fc2 = tf.Variable(tf.random_normal([size_fc2]),name="b_fc2")
     fc2 = tf.matmul(norm_fc1,W_fc2) + b_fc2
     relu_fc2 = tf.nn.relu(fc2, name="relu_fc2")
@@ -144,6 +173,7 @@ def convLayer(input,phase=True):
     batch_mean_fc2, batch_var_fc2 = tf.nn.moments(relu_fc2, [0])
     norm_fc2 = tf.nn.batch_normalization(relu_fc2, batch_mean_fc2, batch_var_fc2, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
+    norm_fc2 = tf.nn.dropout(norm_fc2, keep_prob=0.9)
     ## Final Layer
     W_out = tf.Variable(tf.random_normal([size_fc2,numClasses]),name="W_out")
     b_out = tf.Variable(tf.random_normal([numClasses]),name="b_out")
@@ -209,6 +239,11 @@ def splitData():
     print("Splitting Data Ended")
     return training_data, validation_data,test_data, train_labels, validation_labels,test_labels
 
+def saveFile(accuracyList):
+    f = open("./accuracy.txt","w")
+    for elem in accuracyList:
+        f.write(str(elem)+ '\n')
+
 
 def training():
     print("Started Training")
@@ -232,7 +267,7 @@ def training():
     accuracy = tf.reduce_mean(tf.cast(numberPredictions,tf.float32))
 
     loss = tf.nn.softmax_cross_entropy_with_logits(logits=prediction,labels=inputLabels)
-    optimizer = tf.train.AdamOptimizer(initialLearningRate,epsilon=0.01).minimize(loss)
+    optimizer = tf.train.AdamOptimizer(initialLearningRate).minimize(loss)
 
     prevAccuracy = 0
     saver = tf.train.Saver()
@@ -240,6 +275,8 @@ def training():
         sess.run(tf.global_variables_initializer())
         #for i in range(epochs):
         epoch = 0
+        accuracyList = []
+        ## Run till the max Epochs is reached or reached saturation
         while(1):
             print("In epoch" , epoch)
             start_time = time.time()
@@ -256,20 +293,26 @@ def training():
             ## Checking the Validation accuracy
             index_valid = 0
             currAccuracyList = []
+
+            ## Running till the epochSize
             while(index_valid + batchSize < len_validation_data):
                 currAccuracyList.append(sess.run(accuracy,feed_dict={inputPixels:validation_data[index_valid:index_valid+batchSize],
                                                              inputLabels:validation_labels[index_valid:index_valid+batchSize]}))
                 index_valid = index_valid + batchSize
             currAccuracy = np.mean(currAccuracyList)
+            accuracyList.append(currAccuracy)
             print("epoch time : ",time.time()-start_time)
             print(currAccuracy)
             ## if overfitting is achieved
             if(currAccuracy + 0.05 <  prevAccuracy):
                 print("Saturation has been achieved")
                 print("Epoch : ",epoch+1)
+                restoreNetwork()
                 saver.save(sess,model_path)
+                ## Testing the test accuracy
                 print(sess.run(accuracy, feed_dict={inputPixels: test_data,
                                                     inputLabels: test_labels}))
+                saveFile(accuracyList)
                 break
             prevAccuracy = currAccuracy
 
@@ -279,15 +322,13 @@ def training():
                 print("Max epochs crossed")
                 print("Test Accuracy")
                 saver.save(sess, model_path)
+                ## Testing the test accuracy
                 print(sess.run(accuracy,feed_dict={inputPixels:test_data,
                                                     inputLabels:test_labels}))
                 saver.save(sess, model_path)
+                saveFile(accuracyList)
                 break
-
-
-
-
-
+            backupNetwork()
 
 if __name__ == "__main__":
 
@@ -311,4 +352,4 @@ if __name__ == "__main__":
     # sess = tf.InteractiveSession()
     # sess.run(tf.global_variables_initializer())
     # sess.run(output,feed_dict={input:data[b'data'][:15]})
-
+    #saveFile([1,2,3,4])
