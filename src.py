@@ -14,13 +14,18 @@ numClasses = 10
 
 W_conv1 = 0.0
 W_conv2 = 0.0
+W_conv3 = 0.0
 b_conv1 = 0.0
 b_conv2 = 0.0
+b_conv3 = 0.0
 
 size_conv1 = 5
 size_conv2 = 5
+size_conv3 = 5
+
 depth_conv1 = 64
 depth_conv2 = 64
+depth_conv3 = 64
 
 W_fc1   = 0.0
 W_fc2   = 0.0
@@ -34,7 +39,7 @@ size_fc2 = 192
 W_out = 0.0
 b_out = 0.0
 
-epochs = 256
+epochs = 100
 initialLearningRate = 0.0001
 batchSize = 128
 
@@ -78,12 +83,14 @@ def convLayer(input,phase=True):
     b_conv1 =  tf.Variable(tf.random_normal([depth_conv1]),name="b_conv1")
     ## Convolution layer
     conv1 = tf.nn.conv2d(input,W_conv1,[1,1,1,1],padding='SAME',name="conv1") + b_conv1
-
     relu1 = tf.nn.relu(conv1, name="relu1")
     ## Max pooling
     pool1 = tf.nn.max_pool(relu1,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool1')
     ## Normalise
-    norm1 = tf.contrib.layers.batch_norm(pool1,center=True, scale=True,is_training=phase)
+    #norm1 = tf.contrib.layers.batch_norm(pool1,center=True, scale=True,is_training=phase)
+
+    batch_mean1,batch_var1 = tf.nn.moments(pool1,[0])
+    norm1 = tf.nn.batch_normalization(pool1, batch_mean1, batch_var1, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
 
     ## Second Convolution Layer
@@ -95,29 +102,47 @@ def convLayer(input,phase=True):
     ## Maxpooling
     pool2 = tf.nn.max_pool(relu2,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool2')
     ## Normalisation
-    norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
+    #norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
 
+    batch_mean2, batch_var2 = tf.nn.moments(pool2, [0])
+    norm2 = tf.nn.batch_normalization(pool2, batch_mean2, batch_var2, variance_epsilon=1e-8,scale=1,offset=1e-8)
+
+    ## Added one more convolution layer
+    W_conv3 = tf.get_variable("W_conv3", shape=[size_conv3, size_conv3, depth_conv2, depth_conv3],
+                              initializer=tf.contrib.layers.xavier_initializer())
+    b_conv3 = tf.Variable(tf.random_normal([depth_conv3]), name="b_conv3")
+    conv3 = tf.nn.conv2d(norm2, W_conv3, [1, 1, 1, 1], padding='SAME', name="conv2") + b_conv3
+    relu3 = tf.nn.relu(conv3, name='relu2')
+    ## Normalisation
+    # norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
+    batch_mean3, batch_var3 = tf.nn.moments(relu3, [0])
+    norm3 = tf.nn.batch_normalization(relu3, batch_mean3, batch_var3, variance_epsilon=1e-8, scale=1, offset=1e-8)
 
     ## Divide by 16 because two convolution layers each convolution layer both height and width has a stride of 2
     sizeAfterConv = int(height * width * depth_conv2 / 16)
     print(sizeAfterConv)
 
-    inpFc = tf.reshape(norm2,[-1,sizeAfterConv])
+    inpFc = tf.reshape(norm3,[-1,sizeAfterConv])
     ## Weights for fully connected Layer
     ##W_fc1 = tf.Variable(tf.random_normal([sizeAfterConv,size_fc1]),name="W_fc1")
     W_fc1 = tf.get_variable("W_fc1",shape=[sizeAfterConv,size_fc1],initializer=tf.contrib.layers.xavier_initializer())
     b_fc1 = tf.Variable(tf.random_normal([size_fc1]),name="b_fc1")
     fc1 = tf.matmul(inpFc,W_fc1) + b_fc1
     relu_fc1 = tf.nn.relu(fc1, name="relu_fc1")
-    norm_fc1 = tf.contrib.layers.batch_norm(relu_fc1,center=True,scale=True,is_training=phase)
+    #norm_fc1 = tf.contrib.layers.batch_norm(relu_fc1,center=True,scale=True,is_training=phase)
+
+    batch_mean_fc1, batch_var_fc1 = tf.nn.moments(relu_fc1, [0])
+    norm_fc1 = tf.nn.batch_normalization(relu_fc1, batch_mean_fc1, batch_var_fc1, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
     ##W_fc2 = tf.Variable(tf.random_normal([size_fc1,size_fc2]),name="W_fc2")
     W_fc2 = tf.get_variable("W_fc2",shape= [size_fc1,size_fc2],initializer=tf.contrib.layers.xavier_initializer())
     b_fc2 = tf.Variable(tf.random_normal([size_fc2]),name="b_fc2")
     fc2 = tf.matmul(norm_fc1,W_fc2) + b_fc2
     relu_fc2 = tf.nn.relu(fc2, name="relu_fc2")
-    norm_fc2 = tf.contrib.layers.batch_norm(relu_fc2,center=True,scale=True,is_training=phase)
 
+    #norm_fc2 = tf.contrib.layers.batch_norm(relu_fc2,center=True,scale=True,is_training=phase)
+    batch_mean_fc2, batch_var_fc2 = tf.nn.moments(relu_fc2, [0])
+    norm_fc2 = tf.nn.batch_normalization(relu_fc2, batch_mean_fc2, batch_var_fc2, variance_epsilon=1e-8,scale=1,offset=1e-8)
 
     ## Final Layer
     W_out = tf.Variable(tf.random_normal([size_fc2,numClasses]),name="W_out")
