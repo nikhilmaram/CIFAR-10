@@ -248,7 +248,11 @@ def saveFile(accuracyList):
 def training():
     print("Started Training")
 
-    training_data, validation_data, test_data, training_labels, validation_labels, test_labels = splitData()
+    try:
+        training_data, validation_data, test_data, training_labels, validation_labels, test_labels = splitData()
+    except:
+        print("Please have the data in CIFAR-10 directory")
+        return
     len_training_data = len(training_data)
     len_validation_data = len(validation_data)
 
@@ -331,25 +335,4 @@ def training():
             backupNetwork()
 
 if __name__ == "__main__":
-
-    data_batch_1 = "/Users/sainikhilmaram/OneDrive/UCSB courses/Winter 2018/Advance Topics in Computer Vision/HW2/cifar-10-batches-py/data_batch_1"
     training()
-    #training_data, validation_data, test_data, training_labels, validation_labels, test_labels = splitData()
-    #print(test_data)
-    # print(oneHotVector([2,3,4,5]))
-    # data = unpickle(data_batch_1)
-    # print(data.keys())
-    ##print((data[b'data'][1][1024]))
-    #a = np.array([[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]])
-    #inputData = reshapeData(a)
-
-    #print(data[b'labels'])
-    # inputBytes = height * width * depth
-    # input = tf.placeholder(tf.float32,[None,inputBytes])
-    # inputData = reshapeData(input)
-    # output = convLayer(inputData)
-    # #with tf.Session() as sess:
-    # sess = tf.InteractiveSession()
-    # sess.run(tf.global_variables_initializer())
-    # sess.run(output,feed_dict={input:data[b'data'][:15]})
-    #saveFile([1,2,3,4])
