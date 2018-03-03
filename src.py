@@ -72,7 +72,9 @@ def convLayer(input,phase=True):
     global W_out,b_out
 
     ## First convolution Layer
-    W_conv1 = tf.Variable(tf.random_normal([size_conv1,size_conv1,depth,depth_conv1]),name="W_conv1")
+    ##W_conv1 = tf.Variable(tf.random_normal([size_conv1,size_conv1,depth,depth_conv1]),name="W_conv1")
+    W_conv1 = tf.get_variable("W_conv1",shape = [size_conv1,size_conv1,depth,depth_conv1],initializer=tf.contrib.layers.xavier_initializer())
+
     b_conv1 =  tf.Variable(tf.random_normal([depth_conv1]),name="b_conv1")
     ## Convolution layer
     conv1 = tf.nn.conv2d(input,W_conv1,[1,1,1,1],padding='SAME',name="conv1") + b_conv1
@@ -82,10 +84,11 @@ def convLayer(input,phase=True):
     pool1 = tf.nn.max_pool(relu1,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool1')
     ## Normalise
     norm1 = tf.contrib.layers.batch_norm(pool1,center=True, scale=True,is_training=phase)
-    #norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm1')
+
 
     ## Second Convolution Layer
-    W_conv2 = tf.Variable(tf.random_normal([size_conv2, size_conv2, depth_conv1, depth_conv2]), name="W_conv2")
+    ##W_conv2 = tf.Variable(tf.random_normal([size_conv2, size_conv2, depth_conv1, depth_conv2]), name="W_conv2")
+    W_conv2 = tf.get_variable("W_conv2", shape=[size_conv2, size_conv2, depth_conv1, depth_conv2],initializer=tf.contrib.layers.xavier_initializer())
     b_conv2 = tf.Variable(tf.random_normal([depth_conv2]), name="b_conv2")
     conv2 = tf.nn.conv2d(norm1,W_conv2,[1,1,1,1],padding='SAME',name="conv2") + b_conv2
     relu2 = tf.nn.relu(conv2, name='relu2')
@@ -93,7 +96,7 @@ def convLayer(input,phase=True):
     pool2 = tf.nn.max_pool(relu2,ksize=[1,3,3,1],strides=[1,2,2,1],padding='SAME',name='pool2')
     ## Normalisation
     norm2  = tf.contrib.layers.batch_norm(pool2,center=True,scale=True,is_training=phase)
-    ##norm2 = tf.nn.lrn(pool2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm2')
+
 
     ## Divide by 16 because two convolution layers each convolution layer both height and width has a stride of 2
     sizeAfterConv = int(height * width * depth_conv2 / 16)
@@ -101,27 +104,25 @@ def convLayer(input,phase=True):
 
     inpFc = tf.reshape(norm2,[-1,sizeAfterConv])
     ## Weights for fully connected Layer
-    W_fc1 = tf.Variable(tf.random_normal([sizeAfterConv,size_fc1]),name="W_fc1")
+    ##W_fc1 = tf.Variable(tf.random_normal([sizeAfterConv,size_fc1]),name="W_fc1")
+    W_fc1 = tf.get_variable("W_fc1",shape=[sizeAfterConv,size_fc1],initializer=tf.contrib.layers.xavier_initializer())
     b_fc1 = tf.Variable(tf.random_normal([size_fc1]),name="b_fc1")
-
     fc1 = tf.matmul(inpFc,W_fc1) + b_fc1
     relu_fc1 = tf.nn.relu(fc1, name="relu_fc1")
+    norm_fc1 = tf.contrib.layers.batch_norm(relu_fc1,center=True,scale=True,is_training=phase)
 
-    ##norm_fc1 = tf.contrib.layers.batch_norm(relu_fc1,center=True,scale=True,is_training=phase)
-
-    W_fc2 = tf.Variable(tf.random_normal([size_fc1,size_fc2]),name="W_fc2")
+    ##W_fc2 = tf.Variable(tf.random_normal([size_fc1,size_fc2]),name="W_fc2")
+    W_fc2 = tf.get_variable("W_fc2",shape= [size_fc1,size_fc2],initializer=tf.contrib.layers.xavier_initializer())
     b_fc2 = tf.Variable(tf.random_normal([size_fc2]),name="b_fc2")
-    fc2 = tf.matmul(relu_fc1,W_fc2) + b_fc2
+    fc2 = tf.matmul(norm_fc1,W_fc2) + b_fc2
     relu_fc2 = tf.nn.relu(fc2, name="relu_fc2")
-
-
-    ##norm_fc2 = tf.contrib.layers.batch_norm(relu_fc2,center=True,scale=True,is_training=phase)
+    norm_fc2 = tf.contrib.layers.batch_norm(relu_fc2,center=True,scale=True,is_training=phase)
 
 
     ## Final Layer
     W_out = tf.Variable(tf.random_normal([size_fc2,numClasses]),name="W_out")
     b_out = tf.Variable(tf.random_normal([numClasses]),name="b_out")
-    out = tf.matmul(relu_fc2,W_out) + b_out
+    out = tf.matmul(norm_fc2,W_out) + b_out
 
     return out
 
